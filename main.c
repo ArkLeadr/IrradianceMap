@@ -19,12 +19,6 @@ struct squareFloatImgBlob {
 };
 typedef struct squareFloatImgBlob squareFloatImgBlob;
 
-struct squareByteImgBlob {
-    int width;
-    BYTE* data;
-};
-typedef struct squareByteImgBlob squareByteImgBlob;
-
 
 void loadFromFloatFormat(const char * filename, squareFloatImgBlob* outBlob) {
   FILE *fp ;
@@ -52,173 +46,9 @@ int min(int a, int b) {
     return (a < b ? a : b);
 }
 
-void squareByteImgBlob_init(squareByteImgBlob* blob, int width) {
-    blob->width = width;
-    blob->data = malloc(width*width*3);
-}
-
 void squareFloatImgBlob_init(squareFloatImgBlob* blob, int width) {
     blob->width = width;
     blob->data = malloc(width*width*3*sizeof(float));
-}
-
-void convertByteImgToFloatImg(const squareByteImgBlob* inByteBlob, squareFloatImgBlob* outFloatBlob) {
-    int width = inByteBlob->width;
-
-    for (int i = 0; i < width; ++i) {
-        for (int j = 0; j < width; ++j) {
-            for (int channel = 0; channel < 3; ++channel) {
-                outFloatBlob->data[i * width * 3 + j * 3 + channel] = (float)inByteBlob->data[i * width * 3 + j * 3 + channel] / 255.f;
-            }
-        }
-    }
-
-}
-
-void convertFloatImgToByteImgTonemap(const squareFloatImgBlob* inFloatBlob, squareByteImgBlob* outByteBlob) {
-    int width = inFloatBlob->width;
-    int pixelsCount = width * width;
-    int totalSize = pixelsCount * 3; // 3 floats per pixel
-
-
-    outByteBlob->width = inFloatBlob->width;
-    outByteBlob->data = (BYTE*) malloc(totalSize);
-
-    const double delta = 0.0001;
-
-    float maxVal = 0.f;
-
-    float lumMax[3] = {0.f};
-
-    float avLum[3] = {0.f};
-
-    float keyValue = 0.18f;
-
-    float u, v, radius;
-
-    int n = 0;
-
-    for (int i = 0; i < width; ++i) {
-        for (int j = 0; j < width; ++j) {
-
-            v = (width/2.f - i)/(width/2.f);
-            u = (j - width/2.f)/(width/2.f);
-            radius = sqrtf(u*u + v*v) ;
-
-            if (radius <= 1.0) {
-                ++n;
-
-                for (int channel = 0; channel < 3; ++channel) {
-                    float currentLum = inFloatBlob->data[i * width * 3 + j * 3 + channel];
-
-                    if (currentLum > lumMax[channel]) {
-                        lumMax[channel] = currentLum;
-                    }
-
-                    avLum[channel] += log(currentLum + delta);
-                }
-            }
-
-        }
-    }
-
-    avLum[0] = exp(avLum[0] / (float)n);
-    avLum[1] = exp(avLum[1] / (float)n);
-    avLum[2] = exp(avLum[2] / (float)n);
-
-
-
-    float endMinLum[3] = {100000000.f, 100000000.f, 100000000.f};
-    float endMaxLum[3] = {0.f};
-
-
-//    n = 0.f;
-
-//    for (int i = 0; i < width; ++i) {
-//        for (int j = 0; j < width; ++j) {
-
-//            v = (width/2.f - i)/(width/2.f);
-//            u = (j - width/2.f)/(width/2.f);
-//            radius = sqrtf(u*u + v*v) ;
-
-//            if (radius <= 1.0) {
-//                ++n;
-
-//                for (int channel = 0; channel < 3; ++channel) {
-//                    float floatComponent = inFloatBlob->data[i * width * 3 + j * 3 + channel];
-
-//                    float currentLum = keyValue * floatComponent / avLum[channel];
-
-//                    float lumWhite2 = lumMax[channel];
-
-////                    currentLum = currentLum * (1.f + currentLum / lumWhite2) / (1.f + currentLum);
-
-//                    currentLum = currentLum / (1.f + currentLum);
-
-//                    if (currentLum > endMaxLum[channel]) endMaxLum[channel] = currentLum;
-//                    if (currentLum < endMinLum[channel]) endMinLum[channel] = currentLum;
-//                }
-//            }
-
-//        }
-//    }
-
-
-    for (int i = 0; i < totalSize; ++i) {
-        int channel = i % 3;
-
-        float floatComponent = inFloatBlob->data[i];
-
-        float currentLum = keyValue * inFloatBlob->data[i] / avLum[channel];
-
-//        currentLum = pow(currentLum, 2.2);
-
-//        float lumWhite2 = lumMax[channel];
-
-//        currentLum = currentLum * (1.f + currentLum / lumWhite2) / (1.f + currentLum);
-
-        currentLum = currentLum / (1.f + currentLum);
-
-//        currentLum = (currentLum - endMinLum[channel]) / (endMaxLum[channel] - endMinLum[channel]);
-
-        outByteBlob->data[i] = (uint8_t) (currentLum * 255.f);
-
-        if (channel == FI_RGBA_RED) {
-            BYTE tmp = outByteBlob->data[i];
-            outByteBlob->data[i] = outByteBlob->data[i - 2];
-            outByteBlob->data[i - 2] = tmp;
-
-//            outByteBlob->data[i] = min((int) outByteBlob->data[i] + 30, 255);
-        }
-        else {
-//            outByteBlob->data[i] = 0;
-        }
-    }
-}
-
-void convertFloatImgToByteImg(const squareFloatImgBlob* inFloatBlob, squareByteImgBlob* outByteBlob) {
-    int width = inFloatBlob->width;
-    int pixelsCount = width * width;
-    int totalSize = pixelsCount * 3; // 3 floats per pixel
-
-
-    outByteBlob->width = inFloatBlob->width;
-    outByteBlob->data = (BYTE*) malloc(totalSize);
-
-    for (int i = 0; i < totalSize; ++i) {
-        int channel = i % 3;
-
-        float floatComponent = inFloatBlob->data[i];
-
-        outByteBlob->data[i] = (uint8_t) (floatComponent);
-
-        if (channel == FI_RGBA_RED) {
-            BYTE tmp = outByteBlob->data[i];
-            outByteBlob->data[i] = outByteBlob->data[i - 2];
-            outByteBlob->data[i - 2] = tmp;
-        }
-
-    }
 }
 
 void prefilterAngleMap(const squareFloatImgBlob* inFloatBlob, float coeffs[9][3]) {
@@ -377,192 +207,235 @@ void swapFloat(float* lhs, float* rhs) {
     *rhs = tmp;
 }
 
-void swapByte(BYTE* lhs, BYTE* rhs) {
-    BYTE tmp = *lhs;
 
-    *lhs = *rhs;
-    *rhs = tmp;
-}
+//void squareByteImgBlob_loadFromDib(squareByteImgBlob* blob, FIBITMAP* dib) {
+//    squareByteImgBlob_init(blob, FreeImage_GetWidth(dib));
 
-void squareByteImgBlob_loadFromDib(squareByteImgBlob* blob, FIBITMAP* dib) {
-    squareByteImgBlob_init(blob, FreeImage_GetWidth(dib));
+//    FreeImage_ConvertToRawBits(blob->data, dib, FreeImage_GetWidth(dib) * 3, 24, FI_RGBA_RED_MASK, FI_RGBA_GREEN_MASK, FI_RGBA_BLUE_MASK, TRUE);
 
-    FreeImage_ConvertToRawBits(blob->data, dib, FreeImage_GetWidth(dib) * 3, 24, FI_RGBA_RED_MASK, FI_RGBA_GREEN_MASK, FI_RGBA_BLUE_MASK, TRUE);
-
-    // Swapping blue and red channel since FIF is BGR and masks seems not to work
-    for (int i = 0; i < blob->width; ++i) {
-        for (int j = 0; j < blob->width; ++j) {
-            swapByte(&(blob->data[i * blob->width * 3 + j * 3 + 0]), &(blob->data[i * blob->width * 3 + j * 3 + 2]));
-        }
-    }
-}
-
-#define assignIfInf(var, minVar) if (var < minVar) minVar = var;
-#define assignIfSup(var, maxVar) if (var > maxVar) maxVar = var;
-
-#define between(inf, val, sup) (inf <= val && val <= sup)
-
-#define approx(val, approximant) (between(approximant - 0.005, val, approximant + 0.005))
-
-enum {
-    POSX = 0,
-    NEGX,
-    POXY,
-    NEGY,
-    POSZ,
-    NEGZ
-};
-
-const char* cubemap_filenames[6] = {
-    "posx.jpg",
-    "negx.jpg",
-    "posy.jpg",
-    "negy.jpg",
-    "posz.jpg",
-    "negz.jpg"
-};
-
-void stealOneQuarter(const squareFloatImgBlob* inFloatBlob, squareFloatImgBlob* quarter, int which) {
-    double thetaStart;
-    double phiStart;
-
-    int width = inFloatBlob->width;
-
-    switch(which) {
-    case POSX:
-        thetaStart = (-M_PI_4) + M_PI_2;
-        phiStart = (-M_PI_4);
-        break;
-    case NEGX:
-        thetaStart = (-M_PI_4) - M_PI_2;
-        phiStart = (-M_PI_4);
-        break;
-    case POXY:
-        thetaStart = (-M_PI_4);
-        phiStart = (M_PI_4);
-        break;
-    case NEGY:
-        thetaStart = (-M_PI_4);
-        phiStart = (-M_PI_4 - M_PI_2);
-        break;
-    case POSZ:
-        thetaStart = (-M_PI_4);
-        phiStart = (-M_PI_4);
-        break;
-    case NEGZ:
-        thetaStart = (-M_PI_4) + M_PI;
-        phiStart = (-M_PI_4);
-        break;
-    }
-
-    for (int i = 0 ; i < quarter->width ; i++) {
-        for (int j = 0 ; j < quarter->width ; j++) {
-
-            double r,theta,phi ;
-            int fromI, fromJ;
-
-            double x, y, z;
-
-            theta = thetaStart + (M_PI_2 * ((double)j / (double)quarter->width));
-            phi = phiStart + (M_PI_2 * ((double)i / (double)quarter->width));
-            r = 1.0;
-
-            z = r * cos(phi) * cos(theta);
-            x = r * cos(phi) * sin(theta);
-            y = r * sin(phi);
-
-//            float multiplier = 1.f / x;
-
-//            x *= multiplier;
-//            y *= multiplier;
-//            z *= multiplier;
-
-            double norm = 1.0 / sqrt(x*x + y*y + z*z);
-
-            double DDx = x * norm;
-            double DDy = y * norm;
-            double DDz = z * norm;
-
-            double rr = 0.159154943 * acos(DDz) / sqrt(DDx*DDx + DDy*DDy);
-
-            double sb_u = 0.5 + DDx * rr;
-            double sb_v = 0.5 + DDy * rr;
-
-            fromI = sb_v * width;
-            fromJ = sb_u * width;
-
-            for (int channel = 0; channel < 3; ++channel) {
-                quarter->data[i * quarter->width * 3 + j * 3 + channel] = inFloatBlob->data[fromI * width * 3 + fromJ * 3 + channel];
-            }
-        }
-    }
-
-//    for (int i = 0 ; i < quarter->width ; i++) {
-//        for (int j = 0 ; j < quarter->width ; j++) {
-
-//            float u,v,r,theta,phi ;
-//            int fromI, fromJ;
-
-//            float x, y, z;
-
-//            theta = (-M_PI_4) + (M_PI_2 * ((float)j / (float)quarter->width));
-//            phi = (-M_PI_4) + (M_PI_2 * ((float)i / (float)quarter->width));
-//            r = 1.f;
-
-//            z = r * cosf(phi) * cosf(theta);
-//            x = r * cosf(phi) * sinf(theta);
-//            y = r * sinf(phi);
-
-////            float multiplier = 1.f / x;
-
-////            x *= multiplier;
-////            y *= multiplier;
-////            z *= multiplier;
-
-//            float norm = 1.f / sqrtf(x*x + y*y + z*z);
-
-//            float DDx = x * norm;
-//            float DDy = y * norm;
-//            float DDz = z * norm;
-
-//            float rr = 0.159154943 * acosf(DDz) / sqrtf(DDx*DDx + DDy*DDy);
-
-//            float sb_u = 0.5 + DDx * rr;
-//            float sb_v = 0.5 + DDy * rr;
-
-//            fromI = sb_v * width;
-//            fromJ = sb_u * width;
-
-//            for (int channel = 0; channel < 3; ++channel) {
-//                quarter->data[i * quarter->width * 3 + j * 3 + channel] = inFloatBlob->data[fromI * width * 3 + fromJ * 3 + channel];
-//            }
+//    // Swapping blue and red channel since FIF is BGR and masks seems not to work
+//    for (int i = 0; i < blob->width; ++i) {
+//        for (int j = 0; j < blob->width; ++j) {
+//            swapByte(&(blob->data[i * blob->width * 3 + j * 3 + 0]), &(blob->data[i * blob->width * 3 + j * 3 + 2]));
 //        }
 //    }
+//}
 
+char* getFilenameWithoutExt(const char* filename) {
+    const char *dot = strrchr(filename, '.');
+
+    if(!dot || dot == filename) return "";
+
+    size_t size = dot - filename;
+
+    char* ret = malloc(size + 1);
+
+    memcpy(ret, filename, size);
+    ret[size] = 0;
+
+    return ret;
+}
+
+char* getFilenameExt(const char* filename) {
+    const char *dot = strrchr(filename, '.');
+
+    if(!dot || dot == filename) return "";
+
+    return strdup(dot + 1);
 }
 
 
 int main(void)
 {
-//    FIBITMAP* dib = FreeImage_Load(FIF_BMP, "grace_probe.bmp", 0);
-
-//    squareByteImgBlob byteBmpBlob;
-//    squareByteImgBlob_loadFromDib(&byteBmpBlob, dib);
-
-//    squareFloatImgBlob floatBmpBlob;
-//    squareFloatImgBlob_init(&floatBmpBlob, FreeImage_GetWidth(dib));
-
-//    convertByteImgToFloatImg(&byteBmpBlob, &floatBmpBlob);
-
     squareFloatImgBlob floatProbe;
 
     loadFromFloatFormat("grace_probe.float", &floatProbe);
 
+    const char* filename = "grace_probe.hdr";
+
+    /*
+    FI_ENUM(FREE_IMAGE_FORMAT) {
+        FIF_UNKNOWN = -1,
+        FIF_BMP		= 0,
+        FIF_ICO		= 1,
+        FIF_JPEG	= 2,
+        FIF_JNG		= 3,
+        FIF_KOALA	= 4,
+        FIF_LBM		= 5,
+        FIF_IFF = FIF_LBM,
+        FIF_MNG		= 6,
+        FIF_PBM		= 7,
+        FIF_PBMRAW	= 8,
+        FIF_PCD		= 9,
+        FIF_PCX		= 10,
+        FIF_PGM		= 11,
+        FIF_PGMRAW	= 12,
+        FIF_PNG		= 13,
+        FIF_PPM		= 14,
+        FIF_PPMRAW	= 15,
+        FIF_RAS		= 16,
+        FIF_TARGA	= 17,
+        FIF_TIFF	= 18,
+        FIF_WBMP	= 19,
+        FIF_PSD		= 20,
+        FIF_CUT		= 21,
+        FIF_XBM		= 22,
+        FIF_XPM		= 23,
+        FIF_DDS		= 24,
+        FIF_GIF     = 25,
+        FIF_HDR		= 26,
+        FIF_FAXG3	= 27,
+        FIF_SGI		= 28,
+        FIF_EXR		= 29,
+        FIF_J2K		= 30,
+        FIF_JP2		= 31,
+        FIF_PFM		= 32,
+        FIF_PICT	= 33,
+        FIF_RAW		= 34,
+        FIF_WEBP	= 35,
+        FIF_JXR		= 36
+    };
+    */
+
+    FREE_IMAGE_FORMAT fif = FIF_UNKNOWN;
+    fif = FreeImage_GetFileType(filename, 0);
+
+    printf("Format is %d \n", fif);
+
+    if(fif == FIF_UNKNOWN)
+    {
+       printf("Cannot get filetype from signature, trying extension\n");
+       // If we can't get the signature, try to guess the file format from the file extension
+       fif = FreeImage_GetFIFFromFilename(filename);
+    }
+
+    if(fif == FIF_UNKNOWN)
+    {
+       printf("Cannot get filetype from extension neither, aborting \n");
+
+       exit(EXIT_FAILURE);
+    }
+
+    FIBITMAP* dib = FreeImage_Load(fif, filename, 0);
+
+//    FI_ENUM(FREE_IMAGE_TYPE) {
+//        FIT_UNKNOWN = 0,	// unknown type
+//        FIT_BITMAP  = 1,	// standard image			: 1-, 4-, 8-, 16-, 24-, 32-bit
+//        FIT_UINT16	= 2,	// array of unsigned short	: unsigned 16-bit
+//        FIT_INT16	= 3,	// array of short			: signed 16-bit
+//        FIT_UINT32	= 4,	// array of unsigned long	: unsigned 32-bit
+//        FIT_INT32	= 5,	// array of long			: signed 32-bit
+//        FIT_FLOAT	= 6,	// array of float			: 32-bit IEEE floating point
+//        FIT_DOUBLE	= 7,	// array of double			: 64-bit IEEE floating point
+//        FIT_COMPLEX	= 8,	// array of FICOMPLEX		: 2 x 64-bit IEEE floating point
+//        FIT_RGB16	= 9,	// 48-bit RGB image			: 3 x 16-bit
+//        FIT_RGBA16	= 10,	// 64-bit RGBA image		: 4 x 16-bit
+//        FIT_RGBF	= 11,	// 96-bit RGB float image	: 3 x 32-bit IEEE floating point
+//        FIT_RGBAF	= 12	// 128-bit RGBA float image	: 4 x 32-bit IEEE floating point
+//    };
+
+    FREE_IMAGE_TYPE type = FreeImage_GetImageType(dib);
+
+    printf("Type is %d \n", type);
+
+    // Allocate a raw buffer
+    int width = FreeImage_GetWidth(dib);
+    int height = FreeImage_GetHeight(dib);
+    int pitch = FreeImage_GetPitch(dib);
+    int bpp = FreeImage_GetBPP(dib);
+//    BYTE *bits = (BYTE*)malloc(height * pitch);
+
+    squareFloatImgBlob floatProbe2;
+
+//    loadFromFloatFormat("grace_probe.float", &floatProbe2);
+
+    squareFloatImgBlob_init(&floatProbe2, width);
+
+    // convert the bitmap to raw bits (top-left pixel first)
+//    FreeImage_ConvertToRawBits((BYTE*) floatProbe2.data, dib, FreeImage_GetWidth(dib) * 12, bpp, FI_RGBA_RED_MASK, FI_RGBA_GREEN_MASK, FI_RGBA_BLUE_MASK, TRUE);
+//    FreeImage_Unload(dib);
+
+//    for (int i = 0; i < floatProbe2.width; ++i) {
+//        for (int j = 0; j < floatProbe2.width; ++j) {
+//            swapFloat(&(floatProbe2.data[i * floatProbe2.width * 3 + j * 3 + 0]), &(floatProbe2.data[i * floatProbe2.width * 3 + j * 3 + 2]));
+//        }
+//    }
+
+//    floatProbe2.data = (float*) FreeImage_GetBits(dib);
+
+    FIRGBF testF;
+
     float coeffs[9][3] = {0} ;
 
-//    prefilterAngleMap(&floatProbe, coeffs);
+    for(int y = 0; y < FreeImage_GetHeight(dib); y++) {
+        FIRGBF *bits = (FIRGBF *)FreeImage_GetScanLine(dib, y);
 
-//    prefilterAngleMap(&floatBmpBlob, coeffs);
+        for(int x = 0; x < FreeImage_GetWidth(dib); x++) {
+
+            int i = y;
+            int j = x;
+
+            floatProbe2.data[i * floatProbe2.width * 3 + j * 3 + 0] = bits[x].red;
+            floatProbe2.data[i * floatProbe2.width * 3 + j * 3 + 1] = bits[x].green;
+            floatProbe2.data[i * floatProbe2.width * 3 + j * 3 + 2] = bits[x].blue;
+        }
+    }
+
+
+    for (int i = 500; i < 501; ++i) {
+        for (int j = 500; j < 505; ++j) {
+            printf("%f  ", floatProbe.data[i * floatProbe.width * 3 + j * 3 + 1]);
+        }
+
+        printf("\n");
+    }
+
+    for (int i = 500; i < 501; ++i) {
+        for (int j = 500; j < 505; ++j) {
+            printf("%f  ", floatProbe2.data[i * floatProbe2.width * 3 + j * 3 + 1]);
+        }
+
+        printf("\n");
+    }
+
+    FIRGBF* sl = (FIRGBF*) FreeImage_GetScanLine(dib, 500);
+
+    printf("From scanline : %f\n", sl[500].green);
+
+    printf("%f  \n", floatProbe.data[499 * floatProbe.width * 3 + 499 * 3 + 1]);
+    printf("%f  \n", floatProbe2.data[500 * floatProbe2.width * 3 + 500 * 3 + 1]);
+
+    prefilterAngleMap(&floatProbe, coeffs);
+
+    printf("Filename            : %s\n", filename);
+    printf("Filename (no ext)   : %s\n", getFilenameWithoutExt(filename));
+    printf("Extension           : %s\n", getFilenameExt(filename));
+
+    char* binaryFilename = malloc(strlen(filename) + 1 + strlen("leadrshc") + 1);
+    strcpy(binaryFilename, getFilenameWithoutExt(filename));
+    strcat(binaryFilename, ".leadrshc");
+
+    printf("\n%s\n", binaryFilename);
+
+    FILE* fp = NULL;
+
+    fp = fopen(binaryFilename, "wb");
+
+    fwrite(coeffs, sizeof(float), 9*3, fp);
+
+    fclose(fp);
+
+    for (int i = 0; i < 9*3; ++i) {
+        (coeffs[0])[i] = 0.f;
+    }
+
+    fp = NULL;
+
+    fp = fopen(binaryFilename, "rb");
+
+    fread(coeffs, sizeof(float), 9*3, fp);
+
+    fclose(fp);
 
 
 //    printf("\n         Lighting Coefficients\n\n") ;
@@ -591,29 +464,6 @@ int main(void)
 
 //    printMatricesToGlslDeclaration();
 
-//    printf("%p\n", bytes);
-
-//    FIBITMAP* dibconv = FreeImage_ConvertFromRawBits(bytes, FreeImage_GetWidth(dib), FreeImage_GetWidth(dib), FreeImage_GetWidth(dib) * 3,
-//                                                     24,
-//                                                     FI_RGBA_RED_MASK, FI_RGBA_GREEN_MASK, FI_RGBA_BLUE_MASK, TRUE);
-
-//    FreeImage_Save(FIF_BMP, dibconv, "test.bmp", 0);
-
-    squareByteImgBlob byteProbe;
-    squareFloatImgBlob quarter;
-
-    squareFloatImgBlob_init(&quarter, 1024);
-
-    for (int i = 0; i < 6; ++i) {
-        stealOneQuarter(&floatProbe, &quarter, i);
-
-        convertFloatImgToByteImgTonemap(&quarter, &byteProbe);
-
-        FIBITMAP* dibsave = FreeImage_ConvertFromRawBits(byteProbe.data, byteProbe.width, byteProbe.width, byteProbe.width * 3, 24,
-                                                    FI_RGBA_RED_MASK, FI_RGBA_GREEN_MASK, FI_RGBA_BLUE_MASK, TRUE);
-
-        FreeImage_Save(FIF_JPEG, dibsave, cubemap_filenames[i], 0);
-    }
 
     return 0;
 }
