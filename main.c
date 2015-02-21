@@ -245,13 +245,35 @@ char* getFilenameExt(const char* filename) {
 }
 
 
-int main(void)
+int main( int argc, char *argv[] )
 {
+    if(argc < 2)
+    {
+        printf("Il n'y pas de fichier en entrée.\n");
+        exit(-1);
+    }
+
+    const char* file = argv[1];
+    char * ext;
+    if( ( ext = strrchr( file, '.') ) != NULL )
+    {
+        printf("Usage : Ne pas renseigner l'extension de la probe.\n");
+        exit(-2);
+    }
+
+    char file_float[ strlen(file) + 6 ];
+    strcpy( file_float, file ); 
+    strcat( file_float, ".float" ); 
+
+    char filename[ strlen(file) + 4 ];
+    strcpy( filename, file ); 
+    strcat( filename, ".hdr" ); 
+    
     squareFloatImgBlob floatProbe;
-
-    loadFromFloatFormat("grace_probe.float", &floatProbe);
-
-    const char* filename = "grace_probe.hdr";
+    
+    loadFromFloatFormat( file_float, &floatProbe);
+    
+    //const char* filename = "grace_probe.hdr";
 
     /*
     FI_ENUM(FREE_IMAGE_FORMAT) {
