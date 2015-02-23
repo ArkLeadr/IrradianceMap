@@ -258,6 +258,8 @@ int main(int argc, char** argv)
     {
         std::cerr << "Wrong arguments number.\n";
         std::cerr << "Usage : IrradianceMap pic_filename \n";
+
+        exit(EXIT_FAILURE);
     }
 
     const char* filename = argv[1];
@@ -325,9 +327,9 @@ int main(int argc, char** argv)
     printf("Filename (no ext)   : %s\n", getFilenameWithoutExt(filename));
     printf("Extension           : %s\n", getFilenameExt(filename));
 
-    char* binaryFilename = (char*) malloc(strlen(filename) + 1 + strlen("leadrshc") + 1);
+    char* binaryFilename = (char*) malloc(strlen(filename) + 1 + strlen("shc") + 1);
     strcpy(binaryFilename, getFilenameWithoutExt(filename));
-    strcat(binaryFilename, ".leadrshc");
+    strcat(binaryFilename, ".shc");
 
     printf("\n%s\n", binaryFilename);
 
