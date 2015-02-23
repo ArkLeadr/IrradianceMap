@@ -1,10 +1,11 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-#include <assert.h>
-#include <string.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cmath>
+#include <cassert>
+#include <cstring>
+#include <iostream>
 
-#include "FreeImage.h"
+#include "IL/il.h"
 
 float matrix[4][4][3] ;             /* Matrix for quadratic form */
 
@@ -19,6 +20,18 @@ struct squareFloatImgBlob {
 };
 typedef struct squareFloatImgBlob squareFloatImgBlob;
 
+float floatReverseEndian(float val) {
+    unsigned char* pSrc = (unsigned char*) &val;
+
+    float dst = 0;
+    unsigned char* pDst = (unsigned char*) &dst;
+
+    for (int k = 0; k < 4; ++k) {
+        pDst[k] = pSrc[3 - k];
+    }
+
+    return dst;
+}
 
 void loadFromFloatFormat(const char * filename, squareFloatImgBlob* outBlob) {
   FILE *fp ;
@@ -35,20 +48,30 @@ void loadFromFloatFormat(const char * filename, squareFloatImgBlob* outBlob) {
   outBlob->width = width;
   outBlob->data = (float*) malloc(fileSize);
 
+//  for (int i = 0; i < width*width*3; ++i) {
+//      float val;
+
+//      fread(&val, sizeof(float), 1, fp);
+
+//      outBlob->data[i] = floatReverseEndian(val);
+//  }
+
   size_t bytesRead = fread(outBlob->data, 1, fileSize, fp);
 
-  printf("File %s has width %d and %d\n", filename, width, bytesRead);
+//  printf("File %s has width %d and %d\n", filename, width, bytesRead);
 
   fclose(fp) ;
 }
 
-int min(int a, int b) {
-    return (a < b ? a : b);
-}
-
 void squareFloatImgBlob_init(squareFloatImgBlob* blob, int width) {
     blob->width = width;
-    blob->data = malloc(width*width*3*sizeof(float));
+    blob->data = (float*) malloc(width*width*3*sizeof(float));
+}
+
+void squareFloatImgBlob_reverseEndian(squareFloatImgBlob* blob) {
+//    for (int i = 0; i < blob->width*blob->width*3; ++i) {
+//        blob->data[i] = floatReverseEndian(blob->data[i]);
+//    }
 }
 
 void prefilterAngleMap(const squareFloatImgBlob* inFloatBlob, float coeffs[9][3]) {
@@ -200,35 +223,15 @@ void printMatricesToGlslDeclaration() {
     printf(") ;\n");
 }
 
-void swapFloat(float* lhs, float* rhs) {
-    float tmp = *lhs;
-
-    *lhs = *rhs;
-    *rhs = tmp;
-}
-
-
-//void squareByteImgBlob_loadFromDib(squareByteImgBlob* blob, FIBITMAP* dib) {
-//    squareByteImgBlob_init(blob, FreeImage_GetWidth(dib));
-
-//    FreeImage_ConvertToRawBits(blob->data, dib, FreeImage_GetWidth(dib) * 3, 24, FI_RGBA_RED_MASK, FI_RGBA_GREEN_MASK, FI_RGBA_BLUE_MASK, TRUE);
-
-//    // Swapping blue and red channel since FIF is BGR and masks seems not to work
-//    for (int i = 0; i < blob->width; ++i) {
-//        for (int j = 0; j < blob->width; ++j) {
-//            swapByte(&(blob->data[i * blob->width * 3 + j * 3 + 0]), &(blob->data[i * blob->width * 3 + j * 3 + 2]));
-//        }
-//    }
-//}
 
 char* getFilenameWithoutExt(const char* filename) {
     const char *dot = strrchr(filename, '.');
 
-    if(!dot || dot == filename) return "";
+    if(!dot || dot == filename) return (char*) "";
 
     size_t size = dot - filename;
 
-    char* ret = malloc(size + 1);
+    char* ret = (char*) malloc(size + 1);
 
     memcpy(ret, filename, size);
     ret[size] = 0;
@@ -239,171 +242,82 @@ char* getFilenameWithoutExt(const char* filename) {
 char* getFilenameExt(const char* filename) {
     const char *dot = strrchr(filename, '.');
 
-    if(!dot || dot == filename) return "";
+    if(!dot || dot == filename) return (char*) "";
 
     return strdup(dot + 1);
 }
 
 
-int main(void)
+int main(int argc, char** argv)
 {
     squareFloatImgBlob floatProbe;
 
-    loadFromFloatFormat("grace_probe.float", &floatProbe);
+    ilInit();
 
-    const char* filename = "grace_probe.hdr";
-
-    /*
-    FI_ENUM(FREE_IMAGE_FORMAT) {
-        FIF_UNKNOWN = -1,
-        FIF_BMP		= 0,
-        FIF_ICO		= 1,
-        FIF_JPEG	= 2,
-        FIF_JNG		= 3,
-        FIF_KOALA	= 4,
-        FIF_LBM		= 5,
-        FIF_IFF = FIF_LBM,
-        FIF_MNG		= 6,
-        FIF_PBM		= 7,
-        FIF_PBMRAW	= 8,
-        FIF_PCD		= 9,
-        FIF_PCX		= 10,
-        FIF_PGM		= 11,
-        FIF_PGMRAW	= 12,
-        FIF_PNG		= 13,
-        FIF_PPM		= 14,
-        FIF_PPMRAW	= 15,
-        FIF_RAS		= 16,
-        FIF_TARGA	= 17,
-        FIF_TIFF	= 18,
-        FIF_WBMP	= 19,
-        FIF_PSD		= 20,
-        FIF_CUT		= 21,
-        FIF_XBM		= 22,
-        FIF_XPM		= 23,
-        FIF_DDS		= 24,
-        FIF_GIF     = 25,
-        FIF_HDR		= 26,
-        FIF_FAXG3	= 27,
-        FIF_SGI		= 28,
-        FIF_EXR		= 29,
-        FIF_J2K		= 30,
-        FIF_JP2		= 31,
-        FIF_PFM		= 32,
-        FIF_PICT	= 33,
-        FIF_RAW		= 34,
-        FIF_WEBP	= 35,
-        FIF_JXR		= 36
-    };
-    */
-
-    FREE_IMAGE_FORMAT fif = FIF_UNKNOWN;
-    fif = FreeImage_GetFileType(filename, 0);
-
-    printf("Format is %d \n", fif);
-
-    if(fif == FIF_UNKNOWN)
+    if(argc != 2)
     {
-       printf("Cannot get filetype from signature, trying extension\n");
-       // If we can't get the signature, try to guess the file format from the file extension
-       fif = FreeImage_GetFIFFromFilename(filename);
+        std::cerr << "Wrong arguments number.\n";
+        std::cerr << "Usage : IrradianceMap pic_filename \n";
     }
 
-    if(fif == FIF_UNKNOWN)
-    {
-       printf("Cannot get filetype from extension neither, aborting \n");
+    const char* filename = argv[1];
 
-       exit(EXIT_FAILURE);
+    if (strcmp(getFilenameExt(filename), "float") == 0) {
+        loadFromFloatFormat(filename, &floatProbe);
+    }
+    else {
+        unsigned int width;
+        unsigned int height;
+        float* data;
+        unsigned int bytesPerPixel;
+        int format;
+        int type;
+        int numChannels;
+
+        ILuint imageId;
+
+        bool reversed = false;
+
+        // The image name to return.
+        ilGenImages(1, &imageId); // Grab a new image name.
+        ilBindImage(imageId);
+        ilEnable(IL_ORIGIN_SET);
+
+        if (reversed)
+            ilOriginFunc(IL_ORIGIN_UPPER_LEFT);
+        else
+            ilOriginFunc(IL_ORIGIN_LOWER_LEFT);
+
+        if (ilLoadImage(filename) != IL_TRUE) {
+            std::cerr << "Error loading image from: " << filename << '\n';
+            return false;
+        }
+
+        data = (float*) ilGetData();
+
+        width = ilGetInteger(IL_IMAGE_WIDTH);
+        height = ilGetInteger(IL_IMAGE_HEIGHT);
+
+        bytesPerPixel = ilGetInteger(IL_IMAGE_BYTES_PER_PIXEL);
+
+        format = ilGetInteger(IL_IMAGE_FORMAT);
+        type = ilGetInteger(IL_IMAGE_TYPE);
+        numChannels = ilGetInteger(IL_IMAGE_CHANNELS);
+
+        assert(type == IL_FLOAT);
+        assert(width == height);
+
+        floatProbe.width = width;
+        floatProbe.data = data;
+
+        printf("%d  %d  %d\n", width, height, bytesPerPixel);
     }
 
-    FIBITMAP* dib = FreeImage_Load(fif, filename, 0);
-
-//    FI_ENUM(FREE_IMAGE_TYPE) {
-//        FIT_UNKNOWN = 0,	// unknown type
-//        FIT_BITMAP  = 1,	// standard image			: 1-, 4-, 8-, 16-, 24-, 32-bit
-//        FIT_UINT16	= 2,	// array of unsigned short	: unsigned 16-bit
-//        FIT_INT16	= 3,	// array of short			: signed 16-bit
-//        FIT_UINT32	= 4,	// array of unsigned long	: unsigned 32-bit
-//        FIT_INT32	= 5,	// array of long			: signed 32-bit
-//        FIT_FLOAT	= 6,	// array of float			: 32-bit IEEE floating point
-//        FIT_DOUBLE	= 7,	// array of double			: 64-bit IEEE floating point
-//        FIT_COMPLEX	= 8,	// array of FICOMPLEX		: 2 x 64-bit IEEE floating point
-//        FIT_RGB16	= 9,	// 48-bit RGB image			: 3 x 16-bit
-//        FIT_RGBA16	= 10,	// 64-bit RGBA image		: 4 x 16-bit
-//        FIT_RGBF	= 11,	// 96-bit RGB float image	: 3 x 32-bit IEEE floating point
-//        FIT_RGBAF	= 12	// 128-bit RGBA float image	: 4 x 32-bit IEEE floating point
-//    };
-
-    FREE_IMAGE_TYPE type = FreeImage_GetImageType(dib);
-
-    printf("Type is %d \n", type);
-
-    // Allocate a raw buffer
-    int width = FreeImage_GetWidth(dib);
-    int height = FreeImage_GetHeight(dib);
-    int pitch = FreeImage_GetPitch(dib);
-    int bpp = FreeImage_GetBPP(dib);
-//    BYTE *bits = (BYTE*)malloc(height * pitch);
-
-    squareFloatImgBlob floatProbe2;
-
-//    loadFromFloatFormat("grace_probe.float", &floatProbe2);
-
-    squareFloatImgBlob_init(&floatProbe2, width);
-
-    // convert the bitmap to raw bits (top-left pixel first)
-//    FreeImage_ConvertToRawBits((BYTE*) floatProbe2.data, dib, FreeImage_GetWidth(dib) * 12, bpp, FI_RGBA_RED_MASK, FI_RGBA_GREEN_MASK, FI_RGBA_BLUE_MASK, TRUE);
-//    FreeImage_Unload(dib);
-
-//    for (int i = 0; i < floatProbe2.width; ++i) {
-//        for (int j = 0; j < floatProbe2.width; ++j) {
-//            swapFloat(&(floatProbe2.data[i * floatProbe2.width * 3 + j * 3 + 0]), &(floatProbe2.data[i * floatProbe2.width * 3 + j * 3 + 2]));
-//        }
-//    }
-
-//    floatProbe2.data = (float*) FreeImage_GetBits(dib);
-
-    FIRGBF testF;
 
     float coeffs[9][3] = {0} ;
 
-    for(int y = 0; y < FreeImage_GetHeight(dib); y++) {
-        FIRGBF *bits = (FIRGBF *)FreeImage_GetScanLine(dib, y);
+    squareFloatImgBlob_reverseEndian(&floatProbe);
 
-        for(int x = 0; x < FreeImage_GetWidth(dib); x++) {
-
-            int i = y;
-            int j = x;
-
-            floatProbe2.data[i * floatProbe2.width * 3 + j * 3 + 0] = bits[x].red;
-            floatProbe2.data[i * floatProbe2.width * 3 + j * 3 + 1] = bits[x].green;
-            floatProbe2.data[i * floatProbe2.width * 3 + j * 3 + 2] = bits[x].blue;
-        }
-    }
-
-
-    for (int i = 500; i < 501; ++i) {
-        for (int j = 500; j < 505; ++j) {
-            printf("%f  ", floatProbe.data[i * floatProbe.width * 3 + j * 3 + 1]);
-        }
-
-        printf("\n");
-    }
-
-    for (int i = 500; i < 501; ++i) {
-        for (int j = 500; j < 505; ++j) {
-            printf("%f  ", floatProbe2.data[i * floatProbe2.width * 3 + j * 3 + 1]);
-        }
-
-        printf("\n");
-    }
-
-    FIRGBF* sl = (FIRGBF*) FreeImage_GetScanLine(dib, 500);
-
-    printf("From scanline : %f\n", sl[500].green);
-
-    printf("%f  \n", floatProbe.data[499 * floatProbe.width * 3 + 499 * 3 + 1]);
-    printf("%f  \n", floatProbe2.data[500 * floatProbe2.width * 3 + 500 * 3 + 1]);
 
     prefilterAngleMap(&floatProbe, coeffs);
 
@@ -411,7 +325,7 @@ int main(void)
     printf("Filename (no ext)   : %s\n", getFilenameWithoutExt(filename));
     printf("Extension           : %s\n", getFilenameExt(filename));
 
-    char* binaryFilename = malloc(strlen(filename) + 1 + strlen("leadrshc") + 1);
+    char* binaryFilename = (char*) malloc(strlen(filename) + 1 + strlen("leadrshc") + 1);
     strcpy(binaryFilename, getFilenameWithoutExt(filename));
     strcat(binaryFilename, ".leadrshc");
 
@@ -438,27 +352,27 @@ int main(void)
     fclose(fp);
 
 
-//    printf("\n         Lighting Coefficients\n\n") ;
-//    printf("(l,m)       RED        GREEN     BLUE\n") ;
+    printf("\n         Lighting Coefficients\n\n") ;
+    printf("(l,m)       RED        GREEN     BLUE\n") ;
 
-//    printf("L_{0,0}   %9.6f %9.6f %9.6f\n",
-//       coeffs[0][0],coeffs[0][1],coeffs[0][2]) ;
-//    printf("L_{1,-1}  %9.6f %9.6f %9.6f\n",
-//       coeffs[1][0],coeffs[1][1],coeffs[1][2]) ;
-//    printf("L_{1,0}   %9.6f %9.6f %9.6f\n",
-//       coeffs[2][0],coeffs[2][1],coeffs[2][2]) ;
-//    printf("L_{1,1}   %9.6f %9.6f %9.6f\n",
-//       coeffs[3][0],coeffs[3][1],coeffs[3][2]) ;
-//    printf("L_{2,-2}  %9.6f %9.6f %9.6f\n",
-//       coeffs[4][0],coeffs[4][1],coeffs[4][2]) ;
-//    printf("L_{2,-1}  %9.6f %9.6f %9.6f\n",
-//       coeffs[5][0],coeffs[5][1],coeffs[5][2]) ;
-//    printf("L_{2,0}   %9.6f %9.6f %9.6f\n",
-//       coeffs[6][0],coeffs[6][1],coeffs[6][2]) ;
-//    printf("L_{2,1}   %9.6f %9.6f %9.6f\n",
-//       coeffs[7][0],coeffs[7][1],coeffs[7][2]) ;
-//    printf("L_{2,2}   %9.6f %9.6f %9.6f\n",
-//       coeffs[8][0],coeffs[8][1],coeffs[8][2]) ;
+    printf("L_{0,0}   %9.6f %9.6f %9.6f\n",
+       coeffs[0][0],coeffs[0][1],coeffs[0][2]) ;
+    printf("L_{1,-1}  %9.6f %9.6f %9.6f\n",
+       coeffs[1][0],coeffs[1][1],coeffs[1][2]) ;
+    printf("L_{1,0}   %9.6f %9.6f %9.6f\n",
+       coeffs[2][0],coeffs[2][1],coeffs[2][2]) ;
+    printf("L_{1,1}   %9.6f %9.6f %9.6f\n",
+       coeffs[3][0],coeffs[3][1],coeffs[3][2]) ;
+    printf("L_{2,-2}  %9.6f %9.6f %9.6f\n",
+       coeffs[4][0],coeffs[4][1],coeffs[4][2]) ;
+    printf("L_{2,-1}  %9.6f %9.6f %9.6f\n",
+       coeffs[5][0],coeffs[5][1],coeffs[5][2]) ;
+    printf("L_{2,0}   %9.6f %9.6f %9.6f\n",
+       coeffs[6][0],coeffs[6][1],coeffs[6][2]) ;
+    printf("L_{2,1}   %9.6f %9.6f %9.6f\n",
+       coeffs[7][0],coeffs[7][1],coeffs[7][2]) ;
+    printf("L_{2,2}   %9.6f %9.6f %9.6f\n",
+       coeffs[8][0],coeffs[8][1],coeffs[8][2]) ;
 
 //    tomatrix(coeffs);
 
